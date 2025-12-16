@@ -1,0 +1,14 @@
+WireGuard Config Generator
+==========================
+
+1. Describe every server and peer in `wg.yaml`. The `name`, `endpoint`, `port`, `address_v4`, and peer `address` fields are mandatory.
+2. Run `python3 render-wg-conf.py`. The script creates or reuses keys under `secrets/` and writes ready-to-use configs under `out/<server>/`.
+3. Copy the needed client configs from `out/<server>/peers/` to your devices, or keep them in-place if you manage them locally.
+4. Apply a server config with WireGuard: `sudo wg-quick up out/<server>/<server>.conf`. Bring it down with `sudo wg-quick down out/<server>/<server>.conf` when you need to stop the interface.
+5. Whenever you change `wg.yaml`, rerun the script to regenerate configs so everything stays in sync.
+
+Keep the `secrets/` directory private—those files contain live private keys.
+
+Field tips:
+- `client_routes_default` defines the routes pushed into every client config; override per peer with `client_routes`.
+- `peer_allowed_ips` controls the server-side AllowedIPs block for that peer; if omitted, its own `/32` plus `peer_allowed_ips_default` entries are used automatically.

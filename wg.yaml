@@ -1,0 +1,110 @@
+# ==============================================================================
+# KONFIGURAČNÝ SÚBOR PRE GENERÁTOR WIREGUARD CONFIG (wg.yaml)
+# ==============================================================================
+# Tento súbor definuje servery a k nim pripojených klientov (peers).
+
+servers:
+  # ----------------------------------------------------------------------------
+  # --- SERVER wg1 (Sieť 10.1.0.x, Split Tunnel) ---
+  # ----------------------------------------------------------------------------
+  - name: wg1                                 # Názov rozhrania na serveri (generuje out/wg1/wg1.conf)
+    description: >                                 
+      Hlavná VPN pre BackUp zariadeni.
+      Default je split-tunnel do siete 10.1.0.0/24.
+
+    endpoint: 49.12.200.47                    # Verejná IP/doména, ktorú klienti používajú na pripojenie
+    port: 51821                               # UDP port, na ktorom server počúva
+    address_v4: 10.1.0.1/24                   # Interná VPN IP servera (s maskou siete /24)
+
+    # VŠEOBECNÉ DEFAULTY (ak nie sú definované pre Peer)
+    
+    # DNS: Server automaticky pridá tieto DNS pre klientov, ak ich peer nedefinuje.
+    # dns: ["1.1.1.1", "8.8.8.8"]
+    
+    # client_routes_default: TOTO JE NAJDÔLEŽITEJŠIE! Definuje smerovanie na klientovi.
+    # Ak nie je definované v Peer, použije sa táto hodnota.
+    # "10.1.0.0/24": Split Tunnel (vidí len VPN sieť)
+    # "0.0.0.0/0": Full Tunnel (všetka premávka ide cez VPN)
+    client_routes_default: ["10.1.0.0/24"]
+
+    # ------------------- DEFINÍCIA PEERS (KLIENTOV) --------------------------
+    peers:
+      # --- Klient phone (Split Tunnel) ---
+      - name: phone
+        address: 10.1.0.2                     # Interná VPN IP klienta (skript pridá /32)
+        
+        # peer_allowed_ips: TOTO POUŽÍVA LEN SERVER!
+        # Server povie: "Tento klient (phone) smie prichádzať LEN s IP 10.1.0.2/32"
+        # Pre jedného hosta je toto najbezpečnejšie.
+        #peer_allowed_ips: ["10.1.0.2/32"]
+        
+        # client_routes: Nie je definované, použije sa Default: 10.1.0.0/24
+
+      # --- Klient dell_G7 (Full Tunnel s vlastným DNS) ---
+      - name: dell_G7
+        description: >
+          Laptop Dell G7 .
+          hlavný laptop pre prácu .
+
+        address: 10.1.0.3
+
+        # peer_allowed_ips: Rovnaké pravidlo ako pre phone (kde je klient)
+        #peer_allowed_ips: ["10.1.0.3/32"]
+        
+        # client_routes: Prepíše Default! Klient bude Full Tunnel (všetka premávka)
+        #client_routes: ["0.0.0.0/0"]
+        
+        # dns: Prepíše Default! Klient použije Google DNS.
+        #dns: ["8.8.8.8"] 
+
+      # --- Klient true-nas uložisko pre backup ---
+      - name: true-nas
+        address: 10.1.0.4
+        peer_allowed_ips: ["10.1.0.4/32"]
+        
+        # client_routes: Klient vidí len samotný server, nikam inam ho to nesmeruje.
+        # client_routes: ["10.1.0.1/32"]
+
+
+  # ----------------------------------------------------------------------------
+  # --- SERVER wg2 (Pre oddelenú sieť 10.2.0.x) ---
+  # ----------------------------------------------------------------------------
+  - name: wg2
+    endpoint: 49.12.200.47
+    port: 51822
+    address_v4: 10.2.0.1/24
+    
+    # Definuje default, že sa jedná o Split Tunnel pre túto sieť
+    client_routes_default: ["10.2.0.0/24", "172.30.0.0/24"]
+    # Server automaticky pridá tieto siete do server-side AllowedIPs pre každý peer,
+    # pokiaľ peer nešpecifikuje vlastné.
+    peer_allowed_ips_default: ["172.30.0.0/24"]
+
+    # DNS: Server automaticky pridá tieto DNS pre klientov, ak ich peer nedefinuje.
+    dns: ["172.30.0.4"] # dns na servery 
+
+    # Ďalšie príkazy pre [Interface] blok (vložené tak ako sú)
+    interface_extras:
+       - PostUp = sysctl -w net.ipv4.ip_forward=1
+       - PostDown = true
+     # - PostUp = ip -4 route replace 172.30.0.0/24 dev %i
+      #- PostDown = ip -4 route del 172.30.0.0/24 dev %i || true
+
+    peers:
+      - name: MediaServer   # jellyfin server
+        address: 10.2.0.2
+        peer_allowed_ips:
+          - 10.2.0.2/32 # tento nesmie mať 172.30.0.0/24 v AllowedIPs lebo by vznikol loop
+
+        interface_extras:   # extras pre tento peer pretože je server jellyfin
+          - PostUp = iptables -A FORWARD -i %i -o eth0 -d 172.30.0.0/24 -j ACCEPT; iptables -A FORWARD -i eth0 -o %i -s 172.30.0.0/24 -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.2.0.0/24 -d 172.30.0.0/24 -o eth0 -j MASQUERADE
+          - PostDown = iptables -D FORWARD -i %i -o eth0 -d 172.30.0.0/24 -j ACCEPT; iptables -D FORWARD -i eth0 -o %i -s 172.30.0.0/24 -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.2.0.0/24 -d 172.30.0.0/24 -o eth0 -j MASQUERADE
+
+      - name: Mango-Lenka
+        address: 10.2.0.3
+
+      - name: Samsug-Galaxy-S24U
+        address: 10.2.0.4
+
+      - name: minipc-travelnas
+        address: 10.2.0.5
