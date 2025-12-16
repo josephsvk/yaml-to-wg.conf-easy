@@ -76,9 +76,6 @@ servers:
     
     # Definuje default, že sa jedná o Split Tunnel pre túto sieť
     client_routes_default: ["10.2.0.0/24", "172.30.0.0/24"]
-    # Server automaticky pridá tieto siete do server-side AllowedIPs pre každý peer,
-    # pokiaľ peer nešpecifikuje vlastné.
-    peer_allowed_ips_default: ["172.30.0.0/24"]
 
     # DNS: Server automaticky pridá tieto DNS pre klientov, ak ich peer nedefinuje.
     dns: ["172.30.0.4"] # dns na servery 
@@ -91,20 +88,25 @@ servers:
       #- PostDown = ip -4 route del 172.30.0.0/24 dev %i || true
 
     peers:
-      - name: MediaServer   # jellyfin server
+      - name: mediaserver   # jellyfin server
         address: 10.2.0.2
-        peer_allowed_ips:
-          - 10.2.0.2/32 # tento nesmie mať 172.30.0.0/24 v AllowedIPs lebo by vznikol loop
+
+        # mediaserver je jediný peer, ktorý na server-side routuje 172.30/24.
+        routed_subnets:
+          - 172.30.0.0/24
 
         interface_extras:   # extras pre tento peer pretože je server jellyfin
           - PostUp = iptables -A FORWARD -i %i -o eth0 -d 172.30.0.0/24 -j ACCEPT; iptables -A FORWARD -i eth0 -o %i -s 172.30.0.0/24 -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.2.0.0/24 -d 172.30.0.0/24 -o eth0 -j MASQUERADE
           - PostDown = iptables -D FORWARD -i %i -o eth0 -d 172.30.0.0/24 -j ACCEPT; iptables -D FORWARD -i eth0 -o %i -s 172.30.0.0/24 -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.2.0.0/24 -d 172.30.0.0/24 -o eth0 -j MASQUERADE
 
-      - name: Mango-Lenka
+      - name: mango-lenka
         address: 10.2.0.3
 
-      - name: Samsug-Galaxy-S24U
+      - name: samsug-galaxy-s24u
         address: 10.2.0.4
 
       - name: minipc-travelnas
         address: 10.2.0.5
+      
+      - name: laptop-joseph
+        address: 10.2.0.6

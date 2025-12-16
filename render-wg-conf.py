@@ -30,6 +30,7 @@ servers[]:
     name          (required)  -> peer name + file name
     address       (required)  -> peer VPN IP (script forces /32 on client)
     peer_allowed_ips (optional) -> server-side AllowedIPs (defaults to <address>/32 + server extra)
+    routed_subnets (optional) -> subnets routed via this peer (added to server AllowedIPs)
     description   (optional)  -> copied into generated .conf as comments
     dns           (optional)  -> overrides server dns for this peer (client config only)
     client_routes (optional)  -> overrides server client_routes_default (client config only)
@@ -194,6 +195,31 @@ def safe_list(x) -> list[str]:
     return [str(x)]
 
 
+def resolve_routed_subnets(peer_cfg: dict) -> list[str]:
+    """
+    Subnets routed *via this peer* (server-side). Example: ["172.30.0.0/24"].
+    """
+    return safe_list(peer_cfg.get("routed_subnets"))
+
+
+def assert_no_allowedips_collisions(server_name: str, peers: list[dict]) -> None:
+    """
+    WireGuard requirement for sane routing:
+    - A given CIDR (e.g. 172.30.0.0/24) must not be present in AllowedIPs of multiple peers.
+    - Otherwise routing becomes ambiguous.
+    """
+    seen: dict[str, str] = {}
+    for p in peers:
+        for cidr in p["allowed_ips"]:
+            if cidr in seen:
+                raise SystemExit(
+                    f"server {server_name}: AllowedIPs collision: {cidr} "
+                    f"present in peers {seen[cidr]!r} and {p['name']!r}. "
+                    f"Move the routed subnet to exactly one peer (router peer)."
+                )
+            seen[cidr] = p["name"]
+
+
 def resolve_client_allowed(server_cfg: dict, peer_cfg: dict) -> list[str]:
     """Resolve client-side AllowedIPs with peer override -> server default -> fallback."""
     peer_override = safe_list(
@@ -215,8 +241,13 @@ def resolve_client_allowed(server_cfg: dict, peer_cfg: dict) -> list[str]:
 
 def resolve_peer_allowed(server_cfg: dict, peer_cfg: dict, peer_ip: str) -> list[str]:
     """
-    Resolve server-side AllowedIPs.
-    Always includes the peer's own /32 unless a peer override is explicitly set.
+    Server-side AllowedIPs for a peer:
+      - Always includes peer host /32
+      - Optionally includes server defaults (peer_allowed_ips_default)
+      - Optionally includes peer.routed_subnets (only for router peers)
+
+    If peer explicitly sets peer_allowed_ips/server_allowed_ips/allowed_ips,
+    that value is used as-is (full control).
     """
     peer_override = safe_list(
         peer_cfg.get("peer_allowed_ips")
@@ -230,9 +261,15 @@ def resolve_peer_allowed(server_cfg: dict, peer_cfg: dict, peer_ip: str) -> list
         server_cfg.get("peer_allowed_ips_default")
         or server_cfg.get("server_allowed_ips_default")
     )
+
+    routed = resolve_routed_subnets(peer_cfg)
+
     base = default_peer_allowed(peer_ip)
     if server_extra:
         base.extend(server_extra)
+    if routed:
+        base.extend(routed)
+
     return base
 
 
@@ -441,6 +478,8 @@ def main() -> None:
                     "interface_extras": safe_list(p.get("interface_extras")),
                 }
             )
+
+        assert_no_allowedips_collisions(sname, enriched_peers)
 
         # ---- Write outputs
         out_sdir = OUT / sname
