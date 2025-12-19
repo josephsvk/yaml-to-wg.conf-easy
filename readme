@@ -12,3 +12,13 @@ Keep the `secrets/` directory private—those files contain live private keys.
 Field tips:
 - `client_routes_default` defines the routes pushed into every client config; override per peer with `client_routes`.
 - `peer_allowed_ips` controls the server-side AllowedIPs block for that peer; if omitted, its own `/32` plus `peer_allowed_ips_default` entries are used automatically.
+
+
+# Example patch layout:
+# ./patches/wg3/10-add-postup.patch
+#
+# Make patch:
+#   diff -u /etc/wireguard/wg3.conf /etc/wireguard/wg3.conf.new > ./patches/wg3/10-add-postup.patch
+#
+# Then:
+#   sudo bash ./wg-deploy.sh

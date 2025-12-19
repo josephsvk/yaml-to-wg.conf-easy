@@ -110,3 +110,36 @@ servers:
       
       - name: laptop-joseph
         address: 10.2.0.6
+
+      - name: lenka-iphone-15
+        address: 10.2.0.7
+
+# ----------------------------------------------------------------------------
+# --- SERVER wg3 (Pre oddelenú sieť 10.3.0.x) ---
+# --- Ansible controll network pre správu zariadení ---
+# ----------------------------------------------------------------------------
+  - name: wg3
+    endpoint: 49.12.200.47
+    port: 51823
+    address_v4: 10.3.0.1/24
+
+    # Definuje default, že sa jedná o Split Tunnel pre túto sieť
+    client_routes_default: ["10.3.0.0/24"]
+
+
+    # Ďalšie príkazy pre [Interface] blok (vložené tak ako sú)
+    interface_extras:
+     - PostUp = nft add table inet wg3_fw; nft add chain inet wg3_fw forward '{ type filter hook forward priority 0; policy accept; }'; nft add rule inet wg3_fw forward iifname "%i" oifname "%i" accept
+
+     - PostDown = nft delete table inet wg3_fw
+    peers:
+      - name: ansible-controller
+        address: 10.3.0.2
+
+      - name: notebook-pop-os
+        address: 10.3.0.3
+
+      - name: media-server-v2
+        address: 10.3.0.208
+        
+      

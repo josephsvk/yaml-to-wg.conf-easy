@@ -9,9 +9,10 @@ sudo wg-quick strip ./out/wg1/wg1.conf
 sudo wg-quick down /home/joseph/VPS/wg/out/wg1/wg1.conf
 sudo wg-quick up /home/joseph/VPS/wg/out/wg1/wg1.conf
 
-## wg0 = test server 
-## wg1 = backup server 
+## wg0 = template 
+## wg1 = template 
 ## wg2 = media server 
+## wg3 = controll network
 
 ### render configu : 
 
@@ -76,3 +77,25 @@ sudo nft add table inet wg 2>/dev/null || true
 sudo nft 'add chain inet wg forward { type filter hook forward priority 0; policy drop; }' 2>/dev/null || true
 sudo nft add rule inet wg forward ct state established,related accept 2>/dev/null || true
 sudo nft add rule inet wg forward iifname "wg2" oifname "wg2" accept 2>/dev/null || true
+
+
+### Nastavenia noveho tunella 
+
+# premazat 
+sudo nft delete table inet wg3_fw 2>/dev/null || true
+
+# pravidlo na presmerovanie 
+sudo nft insert rule ip filter ufw-user-forward ip saddr 10.3.0.0/24 ip daddr 10.3.0.0/24 iifname "wg3" oifname "wg3" accept
+
+sudo ufw allow in on wg3 from 10.3.0.0/24
+sudo ufw allow out on wg3 to 10.3.0.0/24
+
+
+# vo wgx.conf už len 
+PostUp = sysctl -w net.ipv4.ip_forward=1
+PostDown = true
+
+# pomohol až reboot
+
+sudo cp -f /home/joseph/VPS/wg/out/wg3/wg3.conf /etc/wireguard/wg3.conf
+sudo chmod 600 /etc/wireguard/wg3.conf 
