@@ -78,7 +78,7 @@ servers:
     client_routes_default: ["10.2.0.0/24", "172.30.0.0/24"]
 
     # DNS: Server automaticky pridá tieto DNS pre klientov, ak ich peer nedefinuje.
-    dns: ["172.30.0.4"] # dns na servery 
+    dns: ["172.30.0.4", "9.9.9.9", "1.1.1.1"] # dns na servery 
 
     # Ďalšie príkazy pre [Interface] blok (vložené tak ako sú)
     interface_extras:
@@ -114,6 +114,9 @@ servers:
       - name: lenka-iphone-15
         address: 10.2.0.7
 
+      - name: notebook-ocino  # predator helios 300 w11 
+        address: 10.2.0.8
+
 # ----------------------------------------------------------------------------
 # --- SERVER wg3 (Pre oddelenú sieť 10.3.0.x) ---
 # --- Ansible controll network pre správu zariadení ---
@@ -140,6 +143,12 @@ servers:
         address: 10.3.0.3
 
       - name: media-server-v2
-        address: 10.3.0.208
+        address: 10.3.0.208   # rovnaky koniec ip ako v localnej sieti 
+
+      - name: tnas
+        address: 10.3.0.4
+
+      - name: media-stack-v2  # arr stack 2026.1.8. 18:08
+        address: 10.3.0.212   # nekonzistentne nastenie ip/id !! 
         
       
